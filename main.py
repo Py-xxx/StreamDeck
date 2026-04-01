@@ -67,7 +67,7 @@ def raw_to_gain(raw: int) -> int:
     Map ADC value (0–1023) to an integer dB gain (-60 to +12).
     Clamped so extreme pot positions never go out of range.
     """
-    return max(GAIN_MIN, min(GAIN_MAX, round((raw / 1023.0) * GAIN_RANGE + GAIN_MIN)))
+    return max(GAIN_MIN, min(GAIN_MAX, round(((1023 - raw) / 1023.0) * GAIN_RANGE + GAIN_MIN)))
 
 
 def find_port() -> str:
