@@ -141,8 +141,12 @@ class StreamDeck:
         gain = raw_to_gain(raw)
         if gain == self._last_sent[pot_id]:
             return   # same 1 dB bucket — nothing to do
-        self._vm.strip[strip_id].gain = float(gain)
-        self._last_sent[pot_id] = gain
+        try:
+            self._vm.strip[strip_id].gain = float(gain)
+            self._last_sent[pot_id] = gain   # only mark sent after confirmed success
+            print(f"  P{pot_id} -> strip[{strip_id}] = {gain:+d} dB")
+        except Exception as exc:
+            print(f"  VM error: strip[{strip_id}] gain={gain}: {exc}")
 
     def _handle_button(self, btn_id: int) -> None:
         action = BUTTON_ACTIONS.get(btn_id)
