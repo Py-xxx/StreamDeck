@@ -38,4 +38,20 @@ export interface AppConfig {
   hardware: Hardware;
   profile_toggle: ProfileToggle;
   profiles: Record<string, Profile>;
+  auto_connect: boolean;
+  launch_on_startup: boolean;
+}
+
+// Serial port info from Rust backend
+export interface PortInfo {
+  name: string;
+  description: string;
+  is_arduino: boolean;
+}
+
+// Connection status from Rust backend
+export interface ConnectionStatus {
+  connected: boolean;
+  port: string | null;
+  error: string | null;
 }

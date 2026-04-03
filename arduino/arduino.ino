@@ -12,10 +12,10 @@ static const uint8_t POT_THRESHOLD = 5;   // raw units — well below 1dB (~14 r
 static int16_t lastPotValues[POT_COUNT];
 
 // === BUTTON MATRIX ===
-static const uint8_t NUM_ROWS = 6;
+static const uint8_t NUM_ROWS = 3;
 static const uint8_t NUM_COLS = 4;
-static const uint8_t rowPins[NUM_ROWS] = {2, 3, 4, 5, 6, 7};
-static const uint8_t colPins[NUM_COLS] = {8, 9, 10, 11};
+static const uint8_t rowPins[NUM_ROWS] = {2, 3, 4};
+static const uint8_t colPins[NUM_COLS] = {5, 6, 7, 8};
 
 static bool     lastState[NUM_ROWS][NUM_COLS];
 static uint32_t debounceTimer[NUM_ROWS][NUM_COLS];
