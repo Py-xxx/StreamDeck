@@ -7,7 +7,7 @@
 
 #![cfg(windows)]
 
-use libloading::{Library, Symbol};
+use libloading::Library;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use std::ffi::CString;
@@ -112,29 +112,31 @@ impl Voicemeeter {
             let library = Library::new(&dll_path)
                 .map_err(|e| VmError::Other(format!("Failed to load DLL: {}", e)))?;
 
-            let login: Symbol<LoginFn> = library
-                .get(b"VBVMR_Login\0")
+            // Get symbols and immediately dereference to raw function pointers
+            // This avoids borrow issues since we copy the function pointers
+            let login: LoginFn = *library
+                .get::<LoginFn>(b"VBVMR_Login\0")
                 .map_err(|e| VmError::Other(format!("Symbol not found: {}", e)))?;
-            let logout: Symbol<LogoutFn> = library
-                .get(b"VBVMR_Logout\0")
+            let logout: LogoutFn = *library
+                .get::<LogoutFn>(b"VBVMR_Logout\0")
                 .map_err(|e| VmError::Other(format!("Symbol not found: {}", e)))?;
-            let set_param_float: Symbol<SetParameterFloatFn> = library
-                .get(b"VBVMR_SetParameterFloat\0")
+            let set_param_float: SetParameterFloatFn = *library
+                .get::<SetParameterFloatFn>(b"VBVMR_SetParameterFloat\0")
                 .map_err(|e| VmError::Other(format!("Symbol not found: {}", e)))?;
-            let get_param_float: Symbol<GetParameterFloatFn> = library
-                .get(b"VBVMR_GetParameterFloat\0")
+            let get_param_float: GetParameterFloatFn = *library
+                .get::<GetParameterFloatFn>(b"VBVMR_GetParameterFloat\0")
                 .map_err(|e| VmError::Other(format!("Symbol not found: {}", e)))?;
-            let is_params_dirty: Symbol<IsParametersDirtyFn> = library
-                .get(b"VBVMR_IsParametersDirty\0")
+            let is_params_dirty: IsParametersDirtyFn = *library
+                .get::<IsParametersDirtyFn>(b"VBVMR_IsParametersDirty\0")
                 .map_err(|e| VmError::Other(format!("Symbol not found: {}", e)))?;
 
             Ok(Self {
                 _library: library,
-                login: *login,
-                logout: *logout,
-                set_param_float: *set_param_float,
-                get_param_float: *get_param_float,
-                is_params_dirty: *is_params_dirty,
+                login,
+                logout,
+                set_param_float,
+                get_param_float,
+                is_params_dirty,
                 logged_in: false,
             })
         }
