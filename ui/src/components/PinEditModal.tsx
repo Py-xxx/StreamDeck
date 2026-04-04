@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { AppConfig, ButtonPinMapping } from "../types";
+import type { AppConfig } from "../types";
 
 interface Props {
   buttonId: number;

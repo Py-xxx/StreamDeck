@@ -1,4 +1,4 @@
-import type { AppConfig, ButtonPinMapping } from "../types";
+import type { AppConfig } from "../types";
 
 interface Props {
   config: AppConfig;
