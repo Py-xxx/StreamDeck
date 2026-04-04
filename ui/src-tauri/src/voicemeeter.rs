@@ -53,9 +53,7 @@ pub struct Voicemeeter {
     login: LoginFn,
     logout: LogoutFn,
     set_param_float: SetParameterFloatFn,
-    #[allow(dead_code)]
     get_param_float: GetParameterFloatFn,
-    #[allow(dead_code)]
     is_params_dirty: IsParametersDirtyFn,
     logged_in: bool,
 }
@@ -203,11 +201,15 @@ impl Voicemeeter {
             return Err(VmError::NotLoggedIn);
         }
 
+        // VBVMR_IsParametersDirty must be called to sync the internal parameter
+        // cache before reading. Without this, GetParameterFloat returns stale values.
+        unsafe { (self.is_params_dirty)() };
+
         let param_cstr = CString::new(param_name).unwrap();
         let mut value: f32 = 0.0;
 
         let result = unsafe { (self.get_param_float)(param_cstr.as_ptr(), &mut value) };
-        
+
         if result == 0 {
             Ok(value)
         } else {
