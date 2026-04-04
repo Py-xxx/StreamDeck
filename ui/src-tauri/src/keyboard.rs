@@ -10,12 +10,19 @@ use std::time::Duration;
 /// Execute an action based on its type.
 ///
 /// # Action Types
+/// - `voicemeeter:*` → Voicemeeter action (mute, solo, mono, bus)
 /// - `mouse_*` → Mouse click (left, right, middle, double)
 /// - `launch:*` → Launch application
 /// - Otherwise → Keyboard shortcut
 pub fn execute_action(action: &str) {
     let action = action.trim();
     if action.is_empty() {
+        return;
+    }
+
+    // Voicemeeter actions
+    if action.starts_with("voicemeeter:") {
+        execute_voicemeeter_action(&action[12..]);
         return;
     }
 
@@ -278,4 +285,54 @@ mod tests {
         assert!(matches!(parse_special_action("volume up"), Some(Key::VolumeUp)));
         assert!(matches!(parse_special_action("play/pause media"), Some(Key::MediaPlayPause)));
     }
+}
+
+/// Execute a Voicemeeter action
+/// 
+/// # Action format
+/// - `mute:0` - Toggle mute on strip 0
+/// - `solo:1` - Toggle solo on strip 1
+/// - `mono:2` - Toggle mono on strip 2
+/// - `A1:0` - Toggle A1 output on strip 0
+/// - `A2:3` - Toggle A2 output on strip 3
+#[cfg(windows)]
+fn execute_voicemeeter_action(action: &str) {
+    use crate::voicemeeter;
+
+    let parts: Vec<&str> = action.split(':').collect();
+    if parts.len() != 2 {
+        eprintln!("Invalid Voicemeeter action format: {}", action);
+        return;
+    }
+
+    let command = parts[0];
+    let strip = match parts[1].parse::<u8>() {
+        Ok(s) => s,
+        Err(_) => {
+            eprintln!("Invalid strip number: {}", parts[1]);
+            return;
+        }
+    };
+
+    let result = match command {
+        "mute" => voicemeeter::toggle_strip_mute(strip),
+        "solo" => voicemeeter::toggle_strip_solo(strip),
+        "mono" => voicemeeter::toggle_strip_mono(strip),
+        "A1" | "A2" | "A3" | "A4" | "A5" | "B1" | "B2" | "B3" => {
+            voicemeeter::toggle_strip_bus(strip, command)
+        }
+        _ => {
+            eprintln!("Unknown Voicemeeter command: {}", command);
+            return;
+        }
+    };
+
+    if let Err(e) = result {
+        eprintln!("Voicemeeter action failed: {}", e);
+    }
+}
+
+#[cfg(not(windows))]
+fn execute_voicemeeter_action(_action: &str) {
+    eprintln!("Voicemeeter actions are only available on Windows");
 }

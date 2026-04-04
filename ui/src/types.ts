@@ -1,5 +1,5 @@
 // Action types for buttons
-export type ActionType = "keyboard" | "mouse" | "multimedia" | "launch";
+export type ActionType = "keyboard" | "mouse" | "multimedia" | "launch" | "voicemeeter";
 
 export interface ButtonConfig {
   label: string;

@@ -198,3 +198,15 @@ export async function pickExecutable(): Promise<string | null> {
 export async function getRawPotValue(potId: number): Promise<number | null> {
   return await invoke<number | null>("get_raw_pot_value", { potId });
 }
+
+// ============================================================================
+// Quick Button Assignment
+// ============================================================================
+
+export async function startQuickAssign(): Promise<void> {
+  await invoke("start_quick_assign");
+}
+
+export async function stopQuickAssign(): Promise<void> {
+  await invoke("stop_quick_assign");
+}

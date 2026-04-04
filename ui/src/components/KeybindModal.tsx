@@ -62,7 +62,29 @@ const MULTIMEDIA_OPTIONS = [
   { value: "volumedown", label: "Volume Down" },
 ];
 
-type Category = "keyboard" | "mouse" | "multimedia" | "launch";
+const VM_STRIPS = [
+  { value: 0, label: "HW Input 1" },
+  { value: 1, label: "HW Input 2" },
+  { value: 2, label: "HW Input 3" },
+  { value: 3, label: "Virtual 1 (VAIO)" },
+  { value: 4, label: "Virtual 2 (AUX)" },
+];
+
+const VM_ACTIONS = [
+  { value: "mute", label: "🔇 Mute" },
+  { value: "solo", label: "🎧 Solo" },
+  { value: "mono", label: "◉ Mono" },
+  { value: "A1", label: "A1" },
+  { value: "A2", label: "A2" },
+  { value: "A3", label: "A3" },
+  { value: "A4", label: "A4" },
+  { value: "A5", label: "A5" },
+  { value: "B1", label: "B1" },
+  { value: "B2", label: "B2" },
+  { value: "B3", label: "B3" },
+];
+
+type Category = "keyboard" | "mouse" | "multimedia" | "launch" | "voicemeeter";
 
 interface CategoryInfo {
   id: Category;
@@ -75,10 +97,12 @@ const CATEGORIES: CategoryInfo[] = [
   { id: "mouse", label: "Mouse", icon: "🖱️" },
   { id: "multimedia", label: "Multimedia", icon: "🎵" },
   { id: "launch", label: "Launch App", icon: "🚀" },
+  { id: "voicemeeter", label: "Voicemeeter", icon: "🎚️" },
 ];
 
 function detectCategory(action: string): Category {
   if (!action) return "keyboard";
+  if (action.startsWith("voicemeeter:")) return "voicemeeter";
   if (action.startsWith("mouse_")) return "mouse";
   if (action.startsWith("launch:")) return "launch";
   if (MULTIMEDIA_OPTIONS.some((opt) => opt.value === action)) return "multimedia";
@@ -95,6 +119,13 @@ export default function KeybindModal({ buttonId, config, updateConfig, onClose }
   const [activeCategory, setActiveCategory] = useState<Category>(
     existing?.action_type ?? detectCategory(existing?.action ?? "")
   );
+  
+  // Parse voicemeeter action if exists
+  const parsedVm = existing?.action.startsWith("voicemeeter:") 
+    ? existing.action.substring(12).split(":")
+    : null;
+  const [vmAction, setVmAction] = useState<string>(parsedVm?.[0] ?? "mute");
+  const [vmStrip, setVmStrip] = useState<number>(parsedVm?.[1] ? parseInt(parsedVm[1]) : 0);
 
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -141,7 +172,12 @@ export default function KeybindModal({ buttonId, config, updateConfig, onClose }
 
   const handleSave = () => {
     const finalLabel = labelText.trim() || getDefaultLabel();
-    const finalAction = capturedAction.trim();
+    let finalAction = capturedAction.trim();
+    
+    // Build voicemeeter action string
+    if (activeCategory === "voicemeeter") {
+      finalAction = `voicemeeter:${vmAction}:${vmStrip}`;
+    }
 
     updateConfig((prev) => {
       const p = prev.profiles[prev.active_profile];
@@ -167,6 +203,11 @@ export default function KeybindModal({ buttonId, config, updateConfig, onClose }
   };
 
   const getDefaultLabel = () => {
+    if (activeCategory === "voicemeeter") {
+      const stripLabel = VM_STRIPS.find((s) => s.value === vmStrip)?.label ?? `Strip ${vmStrip}`;
+      const actionLabel = VM_ACTIONS.find((a) => a.value === vmAction)?.label ?? vmAction;
+      return `${actionLabel} ${stripLabel}`;
+    }
     if (activeCategory === "mouse") {
       return MOUSE_OPTIONS.find((o) => o.value === capturedAction)?.label ?? "Mouse";
     }
@@ -291,6 +332,36 @@ export default function KeybindModal({ buttonId, config, updateConfig, onClose }
                   key={opt.value}
                   className={`keybind-option ${capturedAction === opt.value ? "selected" : ""}`}
                   onClick={() => setCapturedAction(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </>
+        );
+
+      case "voicemeeter":
+        return (
+          <>
+            <div className="modal-section-label">Action</div>
+            <div className="keybind-option-list">
+              {VM_ACTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  className={`keybind-option ${vmAction === opt.value ? "selected" : ""}`}
+                  onClick={() => setVmAction(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <div className="modal-section-label" style={{ marginTop: 16 }}>Strip</div>
+            <div className="keybind-option-list">
+              {VM_STRIPS.map((opt) => (
+                <button
+                  key={opt.value}
+                  className={`keybind-option ${vmStrip === opt.value ? "selected" : ""}`}
+                  onClick={() => setVmStrip(opt.value)}
                 >
                   {opt.label}
                 </button>

@@ -1531,3 +1531,70 @@ textarea {
 .pot-invert-toggle:hover {
   color: var(--text);
 }
+
+/* ── Quick Assign Modal ── */
+.quick-assign-modal {
+  min-width: 500px;
+  max-width: 600px;
+}
+
+.quick-assign-instructions {
+  text-align: center;
+  margin: 16px 0;
+}
+
+.quick-assign-instructions p {
+  margin: 8px 0;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.quick-assign-progress {
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 16px !important;
+}
+
+.quick-assign-grid {
+  padding: 12px;
+  background: var(--surface);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.quick-assign-button {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-raised);
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.quick-assign-button.highlight {
+  background: rgba(248, 187, 0, 0.2);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 16px rgba(248, 187, 0, 0.4);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.quick-assign-button.done {
+  background: rgba(0, 200, 100, 0.15);
+  border-color: #00c864;
+  color: #00ff80;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 16px rgba(248, 187, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(248, 187, 0, 0.6);
+  }
+}

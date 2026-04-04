@@ -136,6 +136,28 @@ fn get_raw_pot_value(pot_id: u8) -> Option<u16> {
 }
 
 // ============================================================================
+// Tauri Commands - Quick Button Assignment
+// ============================================================================
+
+#[tauri::command]
+fn start_quick_assign(window: tauri::Window) {
+    let daemon = get_daemon();
+    let daemon_lock = daemon.lock();
+    
+    // Set up callback to emit event to frontend
+    daemon_lock.set_quick_assign_callback(move |row_pin, col_pin| {
+        let _ = window.emit("quick-assign-button-pressed", (row_pin, col_pin));
+    });
+}
+
+#[tauri::command]
+fn stop_quick_assign() {
+    let daemon = get_daemon();
+    let daemon_lock = daemon.lock();
+    daemon_lock.disable_quick_assign();
+}
+
+// ============================================================================
 // Tauri Commands - Startup
 // ============================================================================
 
@@ -260,6 +282,9 @@ fn main() {
             reload_daemon_config,
             // Calibration
             get_raw_pot_value,
+            // Quick Assign
+            start_quick_assign,
+            stop_quick_assign,
             // Startup
             get_launch_on_startup,
             set_launch_on_startup,

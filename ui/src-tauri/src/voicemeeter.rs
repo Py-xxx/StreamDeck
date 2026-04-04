@@ -196,6 +196,110 @@ impl Voicemeeter {
             Err(VmError::ParameterError(result))
         }
     }
+
+    /// Toggle strip mute
+    pub fn toggle_strip_mute(&self, strip: u8) -> Result<(), VmError> {
+        if !self.logged_in {
+            return Err(VmError::NotLoggedIn);
+        }
+
+        // Get current mute state
+        let param_get = format!("Strip[{}].Mute", strip);
+        let param_cstr = CString::new(param_get).unwrap();
+        let mut current_value: f32 = 0.0;
+
+        // SAFETY: Calling FFI function with valid CString pointer
+        let result = unsafe { (self.get_param_float)(param_cstr.as_ptr(), &mut current_value) };
+        
+        if result != 0 {
+            return Err(VmError::ParameterError(result));
+        }
+
+        // Toggle: 0.0 -> 1.0, 1.0 -> 0.0
+        let new_value = if current_value > 0.5 { 0.0 } else { 1.0 };
+        let result = unsafe { (self.set_param_float)(param_cstr.as_ptr(), new_value) };
+
+        if result == 0 {
+            Ok(())
+        } else {
+            Err(VmError::ParameterError(result))
+        }
+    }
+
+    /// Toggle strip solo
+    pub fn toggle_strip_solo(&self, strip: u8) -> Result<(), VmError> {
+        if !self.logged_in {
+            return Err(VmError::NotLoggedIn);
+        }
+
+        let param = format!("Strip[{}].Solo", strip);
+        let param_cstr = CString::new(param).unwrap();
+        let mut current_value: f32 = 0.0;
+
+        let result = unsafe { (self.get_param_float)(param_cstr.as_ptr(), &mut current_value) };
+        if result != 0 {
+            return Err(VmError::ParameterError(result));
+        }
+
+        let new_value = if current_value > 0.5 { 0.0 } else { 1.0 };
+        let result = unsafe { (self.set_param_float)(param_cstr.as_ptr(), new_value) };
+
+        if result == 0 {
+            Ok(())
+        } else {
+            Err(VmError::ParameterError(result))
+        }
+    }
+
+    /// Toggle strip mono
+    pub fn toggle_strip_mono(&self, strip: u8) -> Result<(), VmError> {
+        if !self.logged_in {
+            return Err(VmError::NotLoggedIn);
+        }
+
+        let param = format!("Strip[{}].Mono", strip);
+        let param_cstr = CString::new(param).unwrap();
+        let mut current_value: f32 = 0.0;
+
+        let result = unsafe { (self.get_param_float)(param_cstr.as_ptr(), &mut current_value) };
+        if result != 0 {
+            return Err(VmError::ParameterError(result));
+        }
+
+        let new_value = if current_value > 0.5 { 0.0 } else { 1.0 };
+        let result = unsafe { (self.set_param_float)(param_cstr.as_ptr(), new_value) };
+
+        if result == 0 {
+            Ok(())
+        } else {
+            Err(VmError::ParameterError(result))
+        }
+    }
+
+    /// Toggle strip bus routing (A1, A2, A3, A4, A5, B1, B2, B3)
+    pub fn toggle_strip_bus(&self, strip: u8, bus: &str) -> Result<(), VmError> {
+        if !self.logged_in {
+            return Err(VmError::NotLoggedIn);
+        }
+
+        let param = format!("Strip[{}].{}", strip, bus);
+        let param_cstr = CString::new(param).unwrap();
+        let mut current_value: f32 = 0.0;
+
+        let result = unsafe { (self.get_param_float)(param_cstr.as_ptr(), &mut current_value) };
+        if result != 0 {
+            return Err(VmError::ParameterError(result));
+        }
+
+        let new_value = if current_value > 0.5 { 0.0 } else { 1.0 };
+        let result = unsafe { (self.set_param_float)(param_cstr.as_ptr(), new_value) };
+
+        if result == 0 {
+            Ok(())
+        } else {
+            Err(VmError::ParameterError(result))
+        }
+    }
 }
 
 impl Drop for Voicemeeter {
@@ -343,5 +447,47 @@ mod tests {
         assert!((raw_to_gain_db_with_curve(1023, 1000) - (-60.0)).abs() < 0.1);
         assert!((raw_to_gain_db_with_curve(0, 100000) - 12.0).abs() < 0.1);
         assert!((raw_to_gain_db_with_curve(1023, 100000) - (-60.0)).abs() < 0.1);
+    }
+}
+
+/// Global convenience functions
+
+/// Toggle strip mute
+pub fn toggle_strip_mute(strip: u8) -> Result<(), VmError> {
+    let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
+    let vm = vm_opt.lock();
+    match vm.as_ref() {
+        Some(voicemeeter) => voicemeeter.toggle_strip_mute(strip),
+        None => Err(VmError::NotLoggedIn),
+    }
+}
+
+/// Toggle strip solo
+pub fn toggle_strip_solo(strip: u8) -> Result<(), VmError> {
+    let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
+    let vm = vm_opt.lock();
+    match vm.as_ref() {
+        Some(voicemeeter) => voicemeeter.toggle_strip_solo(strip),
+        None => Err(VmError::NotLoggedIn),
+    }
+}
+
+/// Toggle strip mono
+pub fn toggle_strip_mono(strip: u8) -> Result<(), VmError> {
+    let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
+    let vm = vm_opt.lock();
+    match vm.as_ref() {
+        Some(voicemeeter) => voicemeeter.toggle_strip_mono(strip),
+        None => Err(VmError::NotLoggedIn),
+    }
+}
+
+/// Toggle strip bus routing (A1-A5, B1-B3)
+pub fn toggle_strip_bus(strip: u8, bus: &str) -> Result<(), VmError> {
+    let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
+    let vm = vm_opt.lock();
+    match vm.as_ref() {
+        Some(voicemeeter) => voicemeeter.toggle_strip_bus(strip, bus),
+        None => Err(VmError::NotLoggedIn),
     }
 }

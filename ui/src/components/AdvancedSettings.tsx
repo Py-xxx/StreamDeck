@@ -16,6 +16,7 @@ interface Props {
   configPath: string;
   expanded: boolean;
   onToggle: () => void;
+  onQuickAssign: () => void;
 }
 
 function parsePins(str: string): number[] {
@@ -33,6 +34,7 @@ export default function AdvancedSettings({
   configPath,
   expanded,
   onToggle,
+  onQuickAssign,
 }: Props) {
   // Debounce timers
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -47,6 +49,7 @@ export default function AdvancedSettings({
   const [launchOnStartup, setLaunchOnStartupState] = useState(false);
   const [vmAvailable, setVmAvailable] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const reconnectTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Load initial state
   useEffect(() => {
@@ -59,6 +62,37 @@ export default function AdvancedSettings({
     const interval = setInterval(refreshConnectionStatus, 2000);
     return () => clearInterval(interval);
   }, []);
+
+  // Auto-reconnect logic
+  useEffect(() => {
+    if (!connectionStatus.connected && config.serial_port && config.auto_connect) {
+      // Start reconnect attempts every 5 seconds
+      if (!reconnectTimerRef.current) {
+        reconnectTimerRef.current = setInterval(async () => {
+          try {
+            console.log("Auto-reconnect: Attempting to reconnect...");
+            await connectSerial(config.serial_port);
+            await refreshConnectionStatus();
+          } catch (e) {
+            // Silently fail, will try again in 5 seconds
+          }
+        }, 5000);
+      }
+    } else {
+      // Connected or auto_connect disabled - stop reconnect attempts
+      if (reconnectTimerRef.current) {
+        clearInterval(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (reconnectTimerRef.current) {
+        clearInterval(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+    };
+  }, [connectionStatus.connected, config.serial_port, config.auto_connect]);
 
   const refreshPorts = async () => {
     try {
@@ -625,6 +659,16 @@ export default function AdvancedSettings({
                 placeholder="e.g. 0,1,2,3"
                 onChange={(e) => handlePotPins(e.target.value)}
               />
+            </div>
+            <div className="settings-group" style={{ marginTop: 8 }}>
+              <button
+                className="btn-primary"
+                onClick={onQuickAssign}
+                style={{ width: "100%" }}
+              >
+                🎯 Quick Button Assignment
+              </button>
+              <span className="settings-helper">Automatically assign buttons by pressing them in order</span>
             </div>
             <div className="settings-group" style={{ marginTop: 8 }}>
               <label className="invert-pots-toggle">

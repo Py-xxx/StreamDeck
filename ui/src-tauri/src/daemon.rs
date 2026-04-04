@@ -127,6 +127,8 @@ impl Daemon {
         let button_press_times = Arc::clone(&self.button_press_times);
         let active_buttons = Arc::clone(&self.active_buttons);
         let last_button_states = Arc::clone(&self.last_button_states);
+        let quick_assign_mode = Arc::clone(&self.quick_assign_mode);
+        let quick_assign_callback = Arc::clone(&self.quick_assign_callback);
         let vm_available = Arc::clone(&self.vm_available);
 
         // Set up message callback
@@ -140,6 +142,8 @@ impl Daemon {
                 &button_press_times,
                 &active_buttons,
                 &last_button_states,
+                &quick_assign_mode,
+                &quick_assign_callback,
                 *vm_available.lock(),
             );
         });
@@ -162,6 +166,8 @@ impl Daemon {
         button_press_times: &Mutex<HashMap<u8, Instant>>,
         active_buttons: &Mutex<HashSet<u8>>,
         last_button_states: &Mutex<HashMap<u8, bool>>,
+        quick_assign_mode: &Mutex<bool>,
+        quick_assign_callback: &Mutex<Option<Box<dyn Fn(u8, u8) + Send + Sync>>>,
         vm_available: bool,
     ) {
         match msg {
@@ -171,7 +177,7 @@ impl Daemon {
                 Self::handle_pot(id, value, config, last_pot_values, vm_available);
             }
             ArduinoMessage::Button { id, pressed } => {
-                Self::handle_button(id, pressed, config, button_press_times, active_buttons, last_button_states);
+                Self::handle_button(id, pressed, config, button_press_times, active_buttons, last_button_states, quick_assign_mode, quick_assign_callback);
             }
         }
     }
@@ -260,6 +266,8 @@ impl Daemon {
         button_press_times: &Mutex<HashMap<u8, Instant>>,
         active_buttons: &Mutex<HashSet<u8>>,
         last_button_states: &Mutex<HashMap<u8, bool>>,
+        quick_assign_mode: &Mutex<bool>,
+        quick_assign_callback: &Mutex<Option<Box<dyn Fn(u8, u8) + Send + Sync>>>,
     ) {
         // Check if this is a state transition (edge detection)
         let last_state = last_button_states.lock().get(&id).copied().unwrap_or(false);
@@ -291,6 +299,14 @@ impl Daemon {
             (Some(r), Some(c)) => (r, c),
             _ => return, // Invalid button ID
         };
+        
+        // Quick assign mode - just report the pin pair and skip normal processing
+        if *quick_assign_mode.lock() && pressed && last_state != pressed {
+            if let Some(ref callback) = *quick_assign_callback.lock() {
+                callback(row_pin, col_pin);
+            }
+            return;
+        }
         
         // Find UI button position that maps to this pin pair
         let ui_button_id = config.hardware.button_pins.iter()

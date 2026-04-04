@@ -7,6 +7,7 @@ import PotRow from "./components/PotRow";
 import KeybindModal from "./components/KeybindModal";
 import PinEditModal from "./components/PinEditModal";
 import PotCalibrationModal from "./components/PotCalibrationModal";
+import QuickAssignModal from "./components/QuickAssignModal";
 import AdvancedSettings from "./components/AdvancedSettings";
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
   const [modalButtonId, setModalButtonId] = useState<number | null>(null);
   const [pinEditButtonId, setPinEditButtonId] = useState<number | null>(null);
   const [calibratePotId, setCalibratePotId] = useState<number | null>(null);
+  const [showQuickAssign, setShowQuickAssign] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [configPath, setConfigPath] = useState<string>("");
 
@@ -118,6 +120,7 @@ export default function App() {
           configPath={configPath}
           expanded={showAdvanced}
           onToggle={() => setShowAdvanced((v) => !v)}
+          onQuickAssign={() => setShowQuickAssign(true)}
         />
       </div>
 
@@ -148,6 +151,15 @@ export default function App() {
           config={config}
           updateConfig={updateConfig}
           onClose={() => setCalibratePotId(null)}
+        />
+      )}
+
+      {/* Quick assign modal */}
+      {showQuickAssign && (
+        <QuickAssignModal
+          config={config}
+          updateConfig={updateConfig}
+          onClose={() => setShowQuickAssign(false)}
         />
       )}
     </div>
