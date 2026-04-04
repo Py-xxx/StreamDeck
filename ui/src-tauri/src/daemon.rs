@@ -11,7 +11,7 @@ use crate::serial::{ArduinoMessage, ConnectionState, SerialManager};
 #[cfg(windows)]
 use crate::voicemeeter;
 use parking_lot::Mutex;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -22,6 +22,8 @@ pub struct Daemon {
     last_pot_values: Arc<Mutex<HashMap<u8, i16>>>,
     last_raw_pot_values: Arc<Mutex<HashMap<u8, u16>>>, // For calibration
     button_press_times: Arc<Mutex<HashMap<u8, Instant>>>,
+    active_buttons: Arc<Mutex<HashSet<u8>>>, // Track currently pressed buttons
+    last_button_states: Arc<Mutex<HashMap<u8, bool>>>, // Track last button state for edge detection
     vm_available: Arc<Mutex<bool>>,
 }
 
@@ -36,6 +38,8 @@ impl Daemon {
             last_pot_values: Arc::new(Mutex::new(HashMap::new())),
             last_raw_pot_values: Arc::new(Mutex::new(HashMap::new())),
             button_press_times: Arc::new(Mutex::new(HashMap::new())),
+            active_buttons: Arc::new(Mutex::new(HashSet::new())),
+            last_button_states: Arc::new(Mutex::new(HashMap::new())),
             vm_available: Arc::new(Mutex::new(false)),
         }
     }
@@ -102,6 +106,8 @@ impl Daemon {
         let last_pot_values = Arc::clone(&self.last_pot_values);
         let last_raw_pot_values = Arc::clone(&self.last_raw_pot_values);
         let button_press_times = Arc::clone(&self.button_press_times);
+        let active_buttons = Arc::clone(&self.active_buttons);
+        let last_button_states = Arc::clone(&self.last_button_states);
         let vm_available = Arc::clone(&self.vm_available);
 
         // Set up message callback
@@ -113,6 +119,8 @@ impl Daemon {
                 &last_pot_values,
                 &last_raw_pot_values,
                 &button_press_times,
+                &active_buttons,
+                &last_button_states,
                 *vm_available.lock(),
             );
         });
@@ -133,6 +141,8 @@ impl Daemon {
         last_pot_values: &Mutex<HashMap<u8, i16>>,
         last_raw_pot_values: &Mutex<HashMap<u8, u16>>,
         button_press_times: &Mutex<HashMap<u8, Instant>>,
+        active_buttons: &Mutex<HashSet<u8>>,
+        last_button_states: &Mutex<HashMap<u8, bool>>,
         vm_available: bool,
     ) {
         match msg {
@@ -142,7 +152,7 @@ impl Daemon {
                 Self::handle_pot(id, value, config, last_pot_values, vm_available);
             }
             ArduinoMessage::Button { id, pressed } => {
-                Self::handle_button(id, pressed, config, button_press_times);
+                Self::handle_button(id, pressed, config, button_press_times, active_buttons, last_button_states);
             }
         }
     }
@@ -189,12 +199,12 @@ impl Daemon {
             } else {
                 // Apply invert only for non-calibrated pots
                 let adjusted = if config.hardware.invert_pots { 1023 - raw } else { raw };
-                voicemeeter::raw_to_gain_db_with_curve(adjusted, config.hardware.pot_ohms)
+                voicemeeter::raw_to_gain_db(adjusted)
             }
         } else {
             // Apply invert only for non-calibrated pots
             let adjusted = if config.hardware.invert_pots { 1023 - raw } else { raw };
-            voicemeeter::raw_to_gain_db_with_curve(adjusted, config.hardware.pot_ohms)
+            voicemeeter::raw_to_gain_db(adjusted)
         };
         let gain_int = gain_db.round() as i16;
 
@@ -229,7 +239,22 @@ impl Daemon {
         pressed: bool,
         config: &AppConfig,
         button_press_times: &Mutex<HashMap<u8, Instant>>,
+        active_buttons: &Mutex<HashSet<u8>>,
+        last_button_states: &Mutex<HashMap<u8, bool>>,
     ) {
+        // Check if this is a state transition (edge detection)
+        let last_state = last_button_states.lock().get(&id).copied().unwrap_or(false);
+        
+        // Update state tracking
+        last_button_states.lock().insert(id, pressed);
+        
+        // Update active buttons set
+        if pressed {
+            active_buttons.lock().insert(id);
+        } else {
+            active_buttons.lock().remove(&id);
+        }
+        
         // Convert Arduino button ID to (row_pin, col_pin)
         // Arduino calculates: id = row_index * num_cols + col_index
         let num_cols = config.hardware.col_pins.len();
@@ -268,13 +293,23 @@ impl Daemon {
 
         // Check if this is the profile toggle button
         if toggle.button_id >= 0 && ui_button_num == toggle.button_id as u8 {
+            // Profile toggle button - allow repeats for hold mode
             Self::handle_profile_toggle(pressed, config, button_press_times, ui_button_num);
             return;
         }
 
-        // Normal button - only act on press
-        if !pressed {
+        // For normal buttons: only act on press transitions (0→1), not holds
+        if !pressed || last_state == pressed {
             return;
+        }
+
+        // Check for multi-press prevention
+        if config.hardware.prevent_multi_press {
+            let active_count = active_buttons.lock().len();
+            if active_count > 1 {
+                // Multiple buttons pressed - ignore action
+                return;
+            }
         }
 
         // Get active profile
@@ -312,13 +347,16 @@ impl Daemon {
             }
             "hold" => {
                 if pressed {
+                    // Switch to secondary profile when holding
                     button_press_times.lock().insert(btn_id, Instant::now());
+                    Self::switch_to_hold_profile(config);
                 } else {
-                    // Release
+                    // Release - return to primary profile
                     if let Some(press_time) = button_press_times.lock().remove(&btn_id) {
                         let elapsed_ms = press_time.elapsed().as_millis() as u32;
                         if elapsed_ms >= toggle.hold_ms {
-                            Self::cycle_profile(config);
+                            // Was a long press, return to primary
+                            Self::switch_to_primary_profile(config);
                         }
                     }
                 }
@@ -327,23 +365,19 @@ impl Daemon {
         }
     }
 
-    /// Cycle to the next profile
+    /// Cycle to the next profile (tap mode)
     fn cycle_profile(config: &AppConfig) {
         let cycle_profiles = &config.profile_toggle.cycle_profiles;
         
-        // Get profiles to cycle through
-        let profiles: Vec<&String> = if cycle_profiles.is_empty() {
-            // Cycle through all profiles
-            let mut all: Vec<&String> = config.profiles.keys().collect();
+        // Get profiles to cycle through (maintain user's selection order)
+        let profiles: Vec<String> = if cycle_profiles.is_empty() {
+            // Cycle through all profiles in sorted order
+            let mut all: Vec<String> = config.profiles.keys().cloned().collect();
             all.sort();
             all
         } else {
-            // Cycle through selected profiles only
-            let mut selected: Vec<&String> = config.profiles.keys()
-                .filter(|k| cycle_profiles.contains(k))
-                .collect();
-            selected.sort();
-            selected
+            // Use cycle_profiles order as-is (user's order)
+            cycle_profiles.clone()
         };
 
         if profiles.is_empty() {
@@ -351,13 +385,48 @@ impl Daemon {
         }
 
         let current = &config.active_profile;
-        let idx = profiles.iter().position(|p| *p == current).unwrap_or(0);
+        let idx = profiles.iter().position(|p| p == current).unwrap_or(0);
         let next_idx = (idx + 1) % profiles.len();
         let next_profile = profiles[next_idx].clone();
 
         // Update config file
         if let Ok(mut new_config) = load_config() {
             new_config.active_profile = next_profile;
+            if let Err(e) = crate::config::save_config(&new_config) {
+                eprintln!("Failed to save config: {}", e);
+            }
+        }
+    }
+
+    /// Switch to hold profile (secondary) in hold mode
+    fn switch_to_hold_profile(config: &AppConfig) {
+        let cycle_profiles = &config.profile_toggle.cycle_profiles;
+        let primary = config.profile_toggle.primary_profile.as_ref()
+            .unwrap_or(&config.active_profile);
+        
+        // Find the other profile (not primary)
+        let secondary = cycle_profiles.iter()
+            .find(|p| p.as_str() != primary)
+            .cloned();
+        
+        if let Some(secondary) = secondary {
+            if let Ok(mut new_config) = load_config() {
+                new_config.active_profile = secondary;
+                if let Err(e) = crate::config::save_config(&new_config) {
+                    eprintln!("Failed to save config: {}", e);
+                }
+            }
+        }
+    }
+
+    /// Return to primary profile in hold mode
+    fn switch_to_primary_profile(config: &AppConfig) {
+        let primary = config.profile_toggle.primary_profile.as_ref()
+            .unwrap_or(&config.active_profile)
+            .clone();
+        
+        if let Ok(mut new_config) = load_config() {
+            new_config.active_profile = primary;
             if let Err(e) = crate::config::save_config(&new_config) {
                 eprintln!("Failed to save config: {}", e);
             }

@@ -58,6 +58,8 @@ pub struct ProfileToggle {
     pub hold_ms: u32,
     #[serde(default)]
     pub cycle_profiles: Vec<String>, // Empty = cycle all
+    #[serde(default)]
+    pub primary_profile: Option<String>, // For hold mode: profile when button not held
 }
 
 impl Default for ProfileToggle {
@@ -67,6 +69,7 @@ impl Default for ProfileToggle {
             mode: "hold".into(),
             hold_ms: 500,
             cycle_profiles: Vec::new(),
+            primary_profile: None,
         }
     }
 }
@@ -104,17 +107,12 @@ pub struct Hardware {
     pub pot_pins: Vec<u8>,
     #[serde(default)]
     pub button_pins: HashMap<String, ButtonPinMapping>,
-    /// Potentiometer resistance in ohms (affects response curve)
-    /// Common values: 1000 (1kΩ), 5000 (5kΩ), 10000 (10kΩ), 50000 (50kΩ), 100000 (100kΩ)
-    #[serde(default = "default_pot_ohms")]
-    pub pot_ohms: u32,
     /// Invert pot direction (swap min/max)
     #[serde(default)]
     pub invert_pots: bool,
-}
-
-fn default_pot_ohms() -> u32 {
-    10000 // 10kΩ default
+    /// Prevent multiple button presses (ignore when >1 button pressed)
+    #[serde(default)]
+    pub prevent_multi_press: bool,
 }
 
 impl Default for Hardware {
@@ -139,8 +137,8 @@ impl Default for Hardware {
             col_pins,
             pot_pins: vec![0, 1, 2, 3],
             button_pins,
-            pot_ohms: 10000, // 10kΩ default
             invert_pots: false,
+            prevent_multi_press: false,
         }
     }
 }

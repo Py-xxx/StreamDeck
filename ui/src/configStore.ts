@@ -35,7 +35,7 @@ export const DEFAULT_CONFIG: AppConfig = {
       "10": { row_pin: 4, col_pin: 7 },
       "11": { row_pin: 4, col_pin: 8 },
     },
-    pot_ohms: 10000, // 10kΩ default
+    invert_pots: false,
   },
   profile_toggle: {
     button_id: -1,
@@ -123,11 +123,6 @@ export async function loadConfig(): Promise<AppConfig> {
       }
     }
     parsed.hardware.button_pins = buttonPins;
-  }
-  
-  // Initialize pot_ohms if missing
-  if (parsed.hardware.pot_ohms === undefined) {
-    parsed.hardware.pot_ohms = 10000; // 10kΩ default
   }
   
   return parsed;

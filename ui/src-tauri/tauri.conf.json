@@ -45,7 +45,11 @@
         "resizable": true,
         "fullscreen": false,
         "center": true,
-        "visible": true
+        "visible": true,
+        "decorations": true,
+        "transparent": false,
+        "skipTaskbar": false,
+        "fileDropEnabled": false
       }
     ]
   }

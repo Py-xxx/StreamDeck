@@ -229,14 +229,6 @@ export default function AdvancedSettings({
     });
   };
 
-  // Pot ohms
-  const handlePotOhms = (value: number) => {
-    updateConfig((prev) => ({
-      ...prev,
-      hardware: { ...prev.hardware, pot_ohms: value },
-    }));
-  };
-
   // Invert pots
   const handleInvertPots = (enabled: boolean) => {
     updateConfig((prev) => ({
@@ -471,59 +463,142 @@ export default function AdvancedSettings({
           {/* 8. Cycle Profiles */}
           <div className="settings-group">
             <label>Cycle Profiles</label>
-            <span className="settings-helper">Select which profiles to cycle through (if none selected, cycles all)</span>
-            <div className="profile-cycle-list">
-              {Object.keys(config.profiles).map((profileName) => {
-                const cycleProfiles = config.profile_toggle.cycle_profiles || [];
-                const isSelected = cycleProfiles.length === 0 || cycleProfiles.includes(profileName);
-                const isExplicitlySelected = cycleProfiles.includes(profileName);
-                
-                return (
-                  <label key={profileName} className="profile-cycle-item">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={(e) => {
-                        updateConfig((prev) => {
-                          const current = prev.profile_toggle.cycle_profiles || [];
-                          let next: string[];
-                          
-                          if (current.length === 0) {
-                            // First explicit selection: include all except unchecked one
-                            const allProfiles = Object.keys(prev.profiles);
-                            if (e.target.checked) {
-                              next = [profileName];
-                            } else {
-                              next = allProfiles.filter(p => p !== profileName);
-                            }
-                          } else if (e.target.checked) {
-                            next = [...current, profileName];
-                          } else {
-                            next = current.filter(p => p !== profileName);
-                            // If only one left, keep empty to mean "all"
-                            if (next.length <= 1) next = [];
-                          }
-                          
-                          return {
-                            ...prev,
-                            profile_toggle: {
-                              ...prev.profile_toggle,
-                              cycle_profiles: next,
-                            },
-                          };
-                        });
-                      }}
-                    />
-                    <span className={`profile-name ${config.active_profile === profileName ? "active" : ""}`}>
-                      {profileName}
-                    </span>
-                    {!isExplicitlySelected && cycleProfiles.length === 0 && (
-                      <span className="all-hint">(all)</span>
-                    )}
-                  </label>
-                );
-              })}
-            </div>
+            {config.profile_toggle.mode === "tap" ? (
+              <>
+                <span className="settings-helper">
+                  Select profiles to cycle through (tap to rotate). Order matters.
+                </span>
+                <div className="profile-cycle-list">
+                  {Object.keys(config.profiles).sort().map((profileName) => {
+                    const cycleProfiles = config.profile_toggle.cycle_profiles || [];
+                    const isSelected = cycleProfiles.length === 0 || cycleProfiles.includes(profileName);
+                    const isActive = config.active_profile === profileName;
+                    
+                    return (
+                      <label key={profileName} className="profile-cycle-item">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            updateConfig((prev) => {
+                              const current = prev.profile_toggle.cycle_profiles || [];
+                              let next: string[];
+                              
+                              if (current.length === 0) {
+                                // First explicit selection
+                                if (e.target.checked) {
+                                  next = [profileName];
+                                } else {
+                                  next = Object.keys(prev.profiles).filter(p => p !== profileName);
+                                }
+                              } else if (e.target.checked) {
+                                next = [...current, profileName];
+                              } else {
+                                next = current.filter(p => p !== profileName);
+                                if (next.length <= 1) next = [];
+                              }
+                              
+                              return {
+                                ...prev,
+                                profile_toggle: {
+                                  ...prev.profile_toggle,
+                                  cycle_profiles: next,
+                                },
+                              };
+                            });
+                          }}
+                        />
+                        <span className={`profile-name ${isActive ? "active-indicator" : ""}`}>
+                          {profileName} {isActive && "●"}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="settings-helper">
+                  Select 2 profiles: primary (default) and secondary (when holding button).
+                </span>
+                <div className="profile-hold-mode">
+                  {Object.keys(config.profiles).sort().map((profileName) => {
+                    const cycleProfiles = config.profile_toggle.cycle_profiles || [];
+                    const primary = config.profile_toggle.primary_profile || config.active_profile;
+                    const isSelected = cycleProfiles.includes(profileName);
+                    const isPrimary = profileName === primary;
+                    const isActive = config.active_profile === profileName;
+                    const canSelect = isSelected || cycleProfiles.length < 2;
+                    
+                    return (
+                      <div key={profileName} className="profile-hold-item">
+                        <label className="profile-hold-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            disabled={!canSelect && !isSelected}
+                            onChange={(e) => {
+                              updateConfig((prev) => {
+                                const current = prev.profile_toggle.cycle_profiles || [];
+                                let next: string[];
+                                
+                                if (e.target.checked) {
+                                  next = [...current, profileName];
+                                  // Limit to 2
+                                  if (next.length > 2) next = next.slice(-2);
+                                } else {
+                                  next = current.filter(p => p !== profileName);
+                                }
+                                
+                                // If removing primary, set new primary to first remaining
+                                let newPrimary = prev.profile_toggle.primary_profile;
+                                if (profileName === newPrimary && !e.target.checked) {
+                                  newPrimary = next[0] || undefined;
+                                }
+                                // If adding first profile, make it primary
+                                if (next.length === 1 && !newPrimary) {
+                                  newPrimary = next[0];
+                                }
+                                
+                                return {
+                                  ...prev,
+                                  profile_toggle: {
+                                    ...prev.profile_toggle,
+                                    cycle_profiles: next,
+                                    primary_profile: newPrimary,
+                                  },
+                                };
+                              });
+                            }}
+                          />
+                          <span className={`profile-name ${isActive ? "active-indicator" : ""}`}>
+                            {profileName} {isActive && "●"}
+                          </span>
+                        </label>
+                        
+                        {isSelected && (
+                          <button
+                            className={`primary-btn ${isPrimary ? "is-primary" : ""}`}
+                            onClick={() => {
+                              updateConfig((prev) => ({
+                                ...prev,
+                                profile_toggle: {
+                                  ...prev.profile_toggle,
+                                  primary_profile: profileName,
+                                },
+                              }));
+                            }}
+                            disabled={isPrimary}
+                          >
+                            {isPrimary ? "★ Primary" : "Set Primary"}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
 
           {/* 9. Hardware Pins */}
@@ -560,21 +635,6 @@ export default function AdvancedSettings({
               />
             </div>
             <div className="settings-group" style={{ marginTop: 8 }}>
-              <label>Potentiometer Resistance</label>
-              <select
-                className="settings-input"
-                value={config.hardware.pot_ohms || 10000}
-                onChange={(e) => handlePotOhms(parseInt(e.target.value, 10))}
-              >
-                <option value={1000}>1kΩ</option>
-                <option value={5000}>5kΩ</option>
-                <option value={10000}>10kΩ (default)</option>
-                <option value={50000}>50kΩ</option>
-                <option value={100000}>100kΩ</option>
-              </select>
-              <span className="settings-helper">Resistance value of your potentiometers</span>
-            </div>
-            <div className="settings-group" style={{ marginTop: 8 }}>
               <label className="invert-pots-toggle">
                 <input
                   type="checkbox"
@@ -584,6 +644,20 @@ export default function AdvancedSettings({
                 Invert Potentiometers
               </label>
               <span className="settings-helper">Swap min/max direction if wired backwards</span>
+            </div>
+            <div className="settings-group" style={{ marginTop: 8 }}>
+              <label className="invert-pots-toggle">
+                <input
+                  type="checkbox"
+                  checked={config.hardware.prevent_multi_press ?? false}
+                  onChange={(e) => updateConfig((prev) => ({
+                    ...prev,
+                    hardware: { ...prev.hardware, prevent_multi_press: e.target.checked },
+                  }))}
+                />
+                Prevent Multiple Button Presses
+              </label>
+              <span className="settings-helper">Ignore actions when multiple buttons pressed simultaneously</span>
             </div>
           </div>
 

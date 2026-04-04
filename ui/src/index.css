@@ -1376,3 +1376,136 @@ select {
 .invert-pots-toggle input {
   cursor: pointer;
 }
+
+/* ── Profile Hold Mode ── */
+.profile-hold-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.profile-hold-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--surface);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.profile-hold-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.profile-hold-checkbox input:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.profile-hold-checkbox input:disabled ~ .profile-name {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.primary-btn {
+  padding: 4px 12px;
+  font-size: 11px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.primary-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.primary-btn.is-primary {
+  background: rgba(248, 187, 0, 0.15);
+  border-color: #f8bb00;
+  color: #ffca28;
+  cursor: default;
+}
+
+.primary-btn:disabled {
+  cursor: default;
+}
+
+.active-indicator {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* ── Native App Feel (Remove Web Behaviors) ── */
+
+/* Disable context menu globally */
+* {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  -webkit-app-region: no-drag;
+}
+
+/* Re-enable text selection and context menu for inputs */
+input,
+textarea,
+input[type="text"],
+input[type="number"],
+input[type="password"],
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* Disable image dragging */
+img {
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+/* Allow pointer events on interactive images if needed */
+img.interactive {
+  pointer-events: auto;
+}
+
+/* Prevent text cursor on non-editable elements */
+body,
+div,
+span,
+button,
+label {
+  cursor: default;
+}
+
+/* Keep pointer cursor on interactive elements */
+button,
+a,
+input[type="checkbox"],
+input[type="radio"],
+.clickable,
+[role="button"] {
+  cursor: pointer;
+}
+
+/* Text cursor for inputs */
+input[type="text"],
+input[type="number"],
+input[type="password"],
+textarea {
+  cursor: text;
+}

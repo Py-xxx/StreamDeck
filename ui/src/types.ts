@@ -29,6 +29,7 @@ export interface ProfileToggle {
   mode: "hold" | "tap";
   hold_ms: number;
   cycle_profiles: string[]; // Which profiles to cycle through
+  primary_profile?: string; // For hold mode: which profile is active when button not held
 }
 
 export interface Display {
@@ -50,10 +51,10 @@ export interface Hardware {
   // Maps UI button position to (row_pin, col_pin) pair
   // Key is button position (0, 1, 2...), value is pin pair
   button_pins?: Record<string, ButtonPinMapping>;
-  // Potentiometer resistance in ohms (affects response curve)
-  pot_ohms?: number;
   // Invert pot direction (swap min/max)
   invert_pots?: boolean;
+  // Prevent multiple button presses (ignore when >1 button pressed)
+  prevent_multi_press?: boolean;
 }
 
 export interface AppConfig {
