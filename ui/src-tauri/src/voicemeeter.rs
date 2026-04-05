@@ -201,9 +201,16 @@ impl Voicemeeter {
             return Err(VmError::NotLoggedIn);
         }
 
-        // VBVMR_IsParametersDirty must be called to sync the internal parameter
-        // cache before reading. Without this, GetParameterFloat returns stale values.
-        unsafe { (self.is_params_dirty)() };
+        // VBVMR_IsParametersDirty must be called to sync the internal parameter cache.
+        // It only updates the buffer when it returns > 0. Poll with retries because
+        // after a Set, VM processes the change asynchronously and reports dirty on the
+        // next cycle — a single call that returns 0 would leave us with stale data.
+        for _ in 0..5 {
+            if unsafe { (self.is_params_dirty)() } > 0 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
 
         let param_cstr = CString::new(param_name).unwrap();
         let mut value: f32 = 0.0;
