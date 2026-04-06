@@ -10,6 +10,7 @@
 use libloading::Library;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
+use std::collections::HashMap;
 use std::ffi::CString;
 use std::path::PathBuf;
 
@@ -46,6 +47,15 @@ type IsParametersDirtyFn = unsafe extern "C" fn() -> i32;
 
 /// Global Voicemeeter instance
 static VOICEMEETER: OnceCell<Mutex<Option<Voicemeeter>>> = OnceCell::new();
+
+/// Cache of boolean parameter states (mute, A1, A2, etc.) that WE have set.
+/// Avoids re-reading from VM — which races with continuous pot/gain SetParameterFloat
+/// calls that cause spurious dirty flags and stale buffer reads.
+static BOOL_STATE_CACHE: OnceCell<Mutex<HashMap<String, bool>>> = OnceCell::new();
+
+fn bool_cache() -> &'static Mutex<HashMap<String, bool>> {
+    BOOL_STATE_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
 
 /// Voicemeeter API wrapper
 pub struct Voicemeeter {
@@ -520,8 +530,12 @@ pub fn toggle_strip_bus(strip: u8, bus: &str) -> Result<(), VmError> {
     }
 }
 
-/// Get strip mute state
+/// Get strip mute state — returns cached value if known, otherwise reads from VM.
 pub fn get_strip_mute(strip: u8) -> Result<bool, VmError> {
+    let key = format!("Strip[{}].Mute", strip);
+    if let Some(&cached) = bool_cache().lock().get(&key) {
+        return Ok(cached);
+    }
     let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
     let vm = vm_opt.lock();
     match vm.as_ref() {
@@ -530,18 +544,26 @@ pub fn get_strip_mute(strip: u8) -> Result<bool, VmError> {
     }
 }
 
-/// Set strip mute
+/// Set strip mute and update the local cache.
 pub fn set_strip_mute(strip: u8, muted: bool) -> Result<(), VmError> {
     let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
     let vm = vm_opt.lock();
     match vm.as_ref() {
-        Some(voicemeeter) => voicemeeter.set_strip_mute(strip, muted),
+        Some(voicemeeter) => {
+            voicemeeter.set_strip_mute(strip, muted)?;
+            bool_cache().lock().insert(format!("Strip[{}].Mute", strip), muted);
+            Ok(())
+        }
         None => Err(VmError::NotLoggedIn),
     }
 }
 
-/// Get strip solo state
+/// Get strip solo state — returns cached value if known, otherwise reads from VM.
 pub fn get_strip_solo(strip: u8) -> Result<bool, VmError> {
+    let key = format!("Strip[{}].Solo", strip);
+    if let Some(&cached) = bool_cache().lock().get(&key) {
+        return Ok(cached);
+    }
     let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
     let vm = vm_opt.lock();
     match vm.as_ref() {
@@ -550,18 +572,26 @@ pub fn get_strip_solo(strip: u8) -> Result<bool, VmError> {
     }
 }
 
-/// Set strip solo
+/// Set strip solo and update the local cache.
 pub fn set_strip_solo(strip: u8, solo: bool) -> Result<(), VmError> {
     let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
     let vm = vm_opt.lock();
     match vm.as_ref() {
-        Some(voicemeeter) => voicemeeter.set_strip_solo(strip, solo),
+        Some(voicemeeter) => {
+            voicemeeter.set_strip_solo(strip, solo)?;
+            bool_cache().lock().insert(format!("Strip[{}].Solo", strip), solo);
+            Ok(())
+        }
         None => Err(VmError::NotLoggedIn),
     }
 }
 
-/// Get strip mono state
+/// Get strip mono state — returns cached value if known, otherwise reads from VM.
 pub fn get_strip_mono(strip: u8) -> Result<bool, VmError> {
+    let key = format!("Strip[{}].Mono", strip);
+    if let Some(&cached) = bool_cache().lock().get(&key) {
+        return Ok(cached);
+    }
     let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
     let vm = vm_opt.lock();
     match vm.as_ref() {
@@ -570,18 +600,26 @@ pub fn get_strip_mono(strip: u8) -> Result<bool, VmError> {
     }
 }
 
-/// Set strip mono
+/// Set strip mono and update the local cache.
 pub fn set_strip_mono(strip: u8, mono: bool) -> Result<(), VmError> {
     let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
     let vm = vm_opt.lock();
     match vm.as_ref() {
-        Some(voicemeeter) => voicemeeter.set_strip_mono(strip, mono),
+        Some(voicemeeter) => {
+            voicemeeter.set_strip_mono(strip, mono)?;
+            bool_cache().lock().insert(format!("Strip[{}].Mono", strip), mono);
+            Ok(())
+        }
         None => Err(VmError::NotLoggedIn),
     }
 }
 
-/// Get strip bus state
+/// Get strip bus state — returns cached value if known, otherwise reads from VM.
 pub fn get_strip_bus(strip: u8, bus: &str) -> Result<bool, VmError> {
+    let key = format!("Strip[{}].{}", strip, bus);
+    if let Some(&cached) = bool_cache().lock().get(&key) {
+        return Ok(cached);
+    }
     let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
     let vm = vm_opt.lock();
     match vm.as_ref() {
@@ -590,12 +628,16 @@ pub fn get_strip_bus(strip: u8, bus: &str) -> Result<bool, VmError> {
     }
 }
 
-/// Set strip bus
+/// Set strip bus and update the local cache.
 pub fn set_strip_bus(strip: u8, bus: &str, enabled: bool) -> Result<(), VmError> {
     let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
     let vm = vm_opt.lock();
     match vm.as_ref() {
-        Some(voicemeeter) => voicemeeter.set_strip_bus(strip, bus, enabled),
+        Some(voicemeeter) => {
+            voicemeeter.set_strip_bus(strip, bus, enabled)?;
+            bool_cache().lock().insert(format!("Strip[{}].{}", strip, bus), enabled);
+            Ok(())
+        }
         None => Err(VmError::NotLoggedIn),
     }
 }
